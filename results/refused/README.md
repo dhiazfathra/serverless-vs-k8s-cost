@@ -21,3 +21,18 @@ against it worthless. And the `divergent_bodies` count of 10,993 was a defect in
 the checker, not in the server: response length legitimately varies with the
 number of decimal digits in the request id, and the check was comparing every
 body against the first body's length. Fixed in `load/burst.js`.
+
+### A confounder that cannot now be ruled out
+
+The 2000/s refusal was recorded at 22:34 local, and at that time the host also
+had a foreign application pinned at 99% of a core with a 1-minute load average
+of 8.6 on 8 cores — outside this experiment, outside the benchmark lock, and not
+noticed until later. Burst 0 of that cell was clean and burst 1 was not, which
+is the signature of transient external contention at least as much as it is the
+signature of genuine saturation.
+
+So the refusal is reported as what it is: **the gate refused a cell, correctly,
+and the reason is not established.** The offered rate was halved anyway, because
+the cheap response to an unexplained saturation is more headroom, not a looser
+gate. The measured cells were taken later on a quiet machine; if they had not
+been, this note would say so instead.
