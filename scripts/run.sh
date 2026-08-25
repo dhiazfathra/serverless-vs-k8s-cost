@@ -84,6 +84,12 @@ IDLE_CALIB_S=${IDLE_CALIB_S:-60}
 
 APP=http://127.0.0.1:18093
 LOCK=${LOCK:-/tmp/expbrief/benchlock.sh}
+# The lock's own owner file. Re-read before EVERY cell: holding the lock is not
+# a fact to cache for forty minutes, it is a fact to re-check. A sweep that
+# trusts its own memory cannot notice a stale reclaim, a release by a confused
+# sibling, or an operator clearing the lock by hand, and every cell it measures
+# afterwards is contended while reporting itself clean.
+LOCK_OWNER_FILE=${LOCK_OWNER_FILE:-/tmp/bench.lock/owner}
 ME=serverless-vs-k8s-cost
 export BENCHLOCK_HB=${BENCHLOCK_HB:-results/.progress}
 mkdir -p results/raw
@@ -96,6 +102,21 @@ K6_TIMEOUT=${K6_TIMEOUT:-180}
 
 appcurl() { curl -fsS --max-time 15 "$@"; }
 healthy() { appcurl "$APP/healthz" >/dev/null 2>&1; }
+
+# Refuse to measure without the lock. Proven to fire by
+# scripts/require_lock_test.sh, which feeds it a lock owned by someone else, a
+# missing owner file, an empty one and a near-miss name. `have_lock` gates the
+# guard itself so a deliberately lock-free development run is still possible --
+# that path prints a warning at acquire time and is never how results are taken.
+have_lock=""
+require_lock() { # cell-label
+	[ -n "$have_lock" ] || return 0
+	scripts/require_lock.sh "$LOCK_OWNER_FILE" "$ME" || {
+		echo "REFUSING $1: we no longer own the benchmark lock, so this cell would" >&2
+		echo "be measured under unknown contention. Re-run to resume." >&2
+		return 1
+	}
+}
 
 dstop() { timeout "$DOCKER_TIMEOUT" docker compose stop -t 2 app >/dev/null 2>&1; }
 drm() { timeout "$DOCKER_TIMEOUT" docker compose rm -fsv app >/dev/null 2>&1; }
@@ -140,6 +161,7 @@ if [ -x "$LOCK" ]; then
 		echo "lock not acquired after 12 attempts; re-run to resume"
 		exit 1
 	}
+	have_lock=yes
 	released=""
 	release() {
 		[ -n "$released" ] && return 0
@@ -181,6 +203,10 @@ done
 # server performing exactly requests x WORK_ROUNDS hash rounds. No latency or
 # cost number is recorded before this passes.
 hb_cell "prepare:equivalence-gate"
+require_lock "prepare:equivalence-gate" || {
+	hb_done "prepare:equivalence-gate" fail
+	exit 1
+}
 drm
 coldstart >/dev/null || {
 	echo "app never came up" >&2
@@ -210,6 +236,10 @@ hb_done "prepare:equivalence-gate" ok
 # the resource table can state idle CPU as a measurement rather than a guess.
 if [ ! -s results/raw/idle_calibration.json ]; then
 	hb_cell "idle-calibration"
+	require_lock "idle-calibration" || {
+		hb_done "idle-calibration" fail
+		exit 1
+	}
 	appcurl -X POST "$APP/reset" >/dev/null
 	sleep "$IDLE_CALIB_S"
 	hb_tick
@@ -252,6 +282,11 @@ run_cell() { # arm duty rep out
 		hb_done "$label" skip
 		return 0
 	fi
+	# Re-checked here, per cell, not once at acquire time forty minutes ago.
+	require_lock "$label" || {
+		hb_done "$label" fail
+		return 1
+	}
 	local d="${out%.json}.d"
 	rm -rf "$d"
 	mkdir -p "$d"

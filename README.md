@@ -98,6 +98,20 @@ to 98%.
   quietly returned a cached or truncated answer cannot pass. It also asserts the
   resource meter reads non-zero — a broken meter must fail here, not produce a
   suspiciously cheap cell later.
+- **Lock ownership is re-checked before every cell.** Holding the shared
+  benchmark lock is not a fact to cache for forty minutes; it is a fact to
+  re-check. `scripts/require_lock.sh` reads the lock's owner file before each
+  cell and refuses the cell if it does not say `serverless-vs-k8s-cost` — and it
+  refuses on a _missing_ owner file too, because no lock at all is not
+  permission to measure. `scripts/require_lock_test.sh` proves it fires against
+  a lock owned by someone else, a missing owner file, an empty one, a near-miss
+  name, and a call with no arguments. It has also been proven end to end: run
+  with the owner file pointed at another name, `run.sh` refuses its first cell
+  before generating any load.
+- **Only the image build runs outside the lock.** The equivalence gate stands a
+  container up and walks 10,000 ids over HTTP, which is load generation, so it
+  runs _inside_ the lock window. A build burns CPU but perturbs nobody's
+  latency, so it does not.
 - **Idle is measured, not assumed free.** A dedicated idle-calibration cell holds
   the container up and untouched and measures what it consumes doing nothing.
 - **Fixed seed** (`20260825`), recorded in every cell. There is no unseeded
