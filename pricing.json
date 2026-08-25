@@ -1,0 +1,132 @@
+{
+  "_README": [
+    "EVERY price constant in this experiment lives in this file, and nothing else in the",
+    "repo contains a currency figure. scripts/cost.py is a pure function of",
+    "(measured resources from results/raw) x (these constants). Change a number here and",
+    "re-run `python3 scripts/cost.py` to get new dollars from the SAME measurement --",
+    "no benchmark re-run required.",
+    "COST IN THIS REPO IS MODELLED, NOT BILLED. No cloud account was charged. The",
+    "measured quantities are CPU-seconds, wall seconds, peak RSS, request count and",
+    "cold-start latency; the dollars are those quantities multiplied by these constants."
+  ],
+  "read_on": "2026-08-25",
+  "how_read": [
+    "Pulled from the AWS Price List Bulk API, us-east-1 region files, on the date above.",
+    "These are public, unauthenticated JSON/CSV endpoints, so every figure below is",
+    "reproducible with curl and jq rather than transcribed from a marketing page.",
+    "The effectiveDate stamped inside the fetched files was 2026-08-24."
+  ],
+  "sources": {
+    "lambda": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AWSLambda/current/us-east-1/index.json",
+    "fargate": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonECS/current/us-east-1/index.json",
+    "ec2": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/us-east-1/index.csv",
+    "eks": "https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEKS/current/us-east-1/index.json"
+  },
+  "reserved_shape": {
+    "_note": [
+      "The shape ENFORCED on the container in docker-compose.yml, identically on both",
+      "arms, and the shape the model bills. Enforced and billed are deliberately the",
+      "same object: costing a reservation that was not enforced would price latency",
+      "produced by resources nobody paid for."
+    ],
+    "vcpu": 1.0,
+    "gib": 0.5
+  },
+  "platform": {
+    "_note": [
+      "Emulated-platform parameters, not prices. idle_timeout_s is how long a",
+      "scale-to-zero platform keeps an instance warm after the last request before",
+      "stopping it -- the single knob that decides whether an idle gap costs you",
+      "money or costs you a cold start. It is declared here and enforced by",
+      "scripts/run.sh, which really does stop the container when the gap exceeds it."
+    ],
+    "idle_timeout_s": 10
+  },
+  "price_sets": {
+    "fargate_arm": {
+      "kind": "per_unit",
+      "label": "Fargate ARM (per-second vCPU + memory)",
+      "usd_per_vcpu_second": 8.994444444444444e-6,
+      "usd_per_gib_second": 9.888888888888888e-7,
+      "usd_per_request": 0.0,
+      "source_lines": [
+        "USE1-Fargate-ARM-vCPU-Hours:perCPU = 0.03238 USD/hour",
+        "USE1-Fargate-ARM-GB-Hours = 0.00356 USD/hour"
+      ],
+      "source": "fargate"
+    },
+    "lambda_arm": {
+      "kind": "per_unit",
+      "label": "Lambda ARM (GB-second + per-request)",
+      "usd_per_vcpu_second": 0.0,
+      "usd_per_gib_second": 1.33334e-5,
+      "usd_per_request": 2e-7,
+      "billed_gib_override": 1.7275390625,
+      "source_lines": [
+        "Lambda-GB-Second-ARM Tier-1 = 0.0000133334 USD/GB-second",
+        "Request-ARM = 0.0000002000 USD/request",
+        "billed_gib_override: Lambda has no separate vCPU price -- CPU is allocated in",
+        "proportion to configured memory, and ~1 vCPU arrives at 1769 MB. To buy the",
+        "1 vCPU this experiment reserved you must configure 1769 MB = 1.7275 GiB, so",
+        "that, not the 512 MiB actually touched, is what Lambda bills.",
+        "Free tier (400,000 GB-s, 1M requests) is NOT applied: it is a fixed monthly",
+        "credit, so including it would make the answer depend on total account usage",
+        "rather than on this workload."
+      ],
+      "source": "lambda"
+    },
+    "ec2_m7g_large_packed": {
+      "kind": "packed_instance",
+      "label": "EC2 m7g.large on-demand, packed",
+      "instance_usd_per_hour": 0.0816,
+      "instance_vcpu": 2,
+      "instance_gib": 8,
+      "source_lines": [
+        "$0.0816 per On Demand Linux m7g.large Instance Hour (2 vCPU, 8 GiB, Graviton3)",
+        "Cost is attributed as the LARGEST fraction of the instance the reserved shape",
+        "occupies on either axis, i.e. max(vcpu/2, gib/8). That charges for the",
+        "binding dimension and assumes the rest of the node is perfectly filled by",
+        "other work -- the most charitable possible assumption for the always-on arm."
+      ],
+      "source": "ec2"
+    }
+  },
+  "fixed_fees": {
+    "eks_cluster_usd_per_hour": {
+      "value": 0.1,
+      "source": "eks",
+      "source_lines": [
+        "USE1-AmazonEKS-Hours:perCluster = 0.1000000000 USD/hour"
+      ],
+      "_note": [
+        "Charged per CLUSTER, not per workload, so the headline numbers EXCLUDE it --",
+        "the charitable reading for the always-on arm, which assumes the cluster is",
+        "already paid for by other services. cost.py reports a separate sensitivity",
+        "row showing what it does to a single-service cluster, because for one",
+        "workload it dwarfs the compute."
+      ]
+    }
+  },
+  "comparisons": {
+    "same_rates_isolates_idle": {
+      "label": "Same rates on both arms - isolates idle time",
+      "scale_to_zero": "fargate_arm",
+      "always_on": "fargate_arm",
+      "_note": [
+        "The controlled comparison. Identical unit prices on both arms, so the only",
+        "thing left to move the dollars is billed seconds -- i.e. idle. Any crossover",
+        "here is caused by idle and cold starts and nothing else."
+      ]
+    },
+    "typical_shapes": {
+      "label": "Lambda vs an EC2-backed node - what people actually compare",
+      "scale_to_zero": "lambda_arm",
+      "always_on": "ec2_m7g_large_packed",
+      "_note": [
+        "The uncontrolled comparison people actually make. It mixes TWO variables:",
+        "billed seconds and unit price. Reported second, and never as the",
+        "explanation for the first."
+      ]
+    }
+  }
+}

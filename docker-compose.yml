@@ -1,0 +1,38 @@
+name: serverless-vs-k8s-cost
+
+# Images are pinned by content digest so the harness is reproducible:
+#   golang:1.27-alpine  sha256:4c9fe60190a2a3350ddc51de80d0224b8a6698d12bdfc999fee45ea9d6c46dbc
+#   alpine:3.21         sha256:48b0309ca019d89d40f670aa1bc06e426dc0931948452e8491e3d65087abc07d
+#   grafana/k6:latest   sha256:5221b620a4f874faff6e32ba597aa667c058391fe4898b1c6f6377f062c6cdec
+
+services:
+  # ONE service definition serves BOTH arms. The arms differ only in lifecycle:
+  # `scale-to-zero` destroys and recreates this container around every burst, so
+  # its cold starts are real; `always-on` leaves the identical container running
+  # across the whole cell, so it never cold-starts and pays for idle instead.
+  #
+  # The reserved shape is ENFORCED here, identically for both arms, and it is
+  # the same shape the cost model bills. Costing a reservation that was not
+  # enforced would let the measured latency come from resources nobody paid
+  # for; capping both arms at 1 vCPU / 512 MiB keeps the priced shape and the
+  # measured shape the same object.
+  app:
+    build: .
+    environment:
+      WORK_ROUNDS: "${WORK_ROUNDS:-200}"
+      LISTEN: ":8080"
+      GOMAXPROCS: "1"
+    ports: ["18093:8080"]
+    restart: "no"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  k6:
+    image: grafana/k6@sha256:5221b620a4f874faff6e32ba597aa667c058391fe4898b1c6f6377f062c6cdec
+    entrypoint: ["k6"]
+    working_dir: /work
+    volumes: [".:/work"]
+    profiles: ["tools"]
