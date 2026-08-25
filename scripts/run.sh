@@ -120,39 +120,11 @@ k6run() { # cellcycle-out env...
 NCELLS=$((REPS * $(echo "$DUTIES" | wc -w | tr -d ' ') * $(echo "$ARMS" | wc -w | tr -d ' ')))
 hb_init "$((2 + 1 + 1 + NCELLS))"
 
+# Building is lock-free: it burns CPU but generates no load against a server,
+# so it cannot perturb another experiment's latency measurement.
 hb_cell "prepare:build"
 timeout 600 docker compose build app >/dev/null
 hb_done "prepare:build" ok
-
-# The equivalence gate. Run against a container that has JUST cold started --
-# the scale-to-zero shape -- and again against the same container after it has
-# been up and serving, the always-on shape. Both must return byte-identical
-# bodies for the whole id space, recomputed locally, and both must show the
-# server performing exactly requests x WORK_ROUNDS hash rounds. No latency or
-# cost number is recorded before this passes.
-hb_cell "prepare:equivalence-gate"
-drm
-coldstart >/dev/null || {
-	echo "app never came up" >&2
-	hb_done "prepare:equivalence-gate" fail
-	exit 1
-}
-(
-	while sleep 20; do hb_tick; done
-) &
-ticker=$!
-gate_ok=yes
-APP_URL=$APP IDS=$IDS go test ./bench -count=1 -timeout 30m 2>&1 | tail -3 || gate_ok=""
-# Same container, now warm and having served the whole id space once: the
-# always-on shape must agree with the cold one, byte for byte.
-APP_URL=$APP IDS=$IDS go test ./bench -count=1 -timeout 30m 2>&1 | tail -3 || gate_ok=""
-kill "$ticker" 2>/dev/null || true
-if [ -z "$gate_ok" ]; then
-	hb_done "prepare:equivalence-gate" fail
-	echo "equivalence gate failed; refusing to measure" >&2
-	exit 1
-fi
-hb_done "prepare:equivalence-gate" ok
 
 # ---- exclusive measurement window -----------------------------------------
 if [ -x "$LOCK" ]; then
@@ -193,6 +165,44 @@ for _ in $(seq 1 30); do
 	hb_tick
 	sleep 10
 done
+
+# The equivalence gate, INSIDE the lock window. It used to run before the
+# acquire, which was wrong: it starts a container and then walks 10 000 ids over
+# HTTP, which is load generation by any definition. The concurrent
+# master-data-sync-convergence experiment observed this repo's `bench.test` at
+# ~40% CPU while IT held the lock, and it was right to complain -- a contended
+# cell is not a slow cell, it is an invalid one. Only the image build stays
+# outside the lock, because a build perturbs nobody's latency.
+#
+# Run against a container that has JUST cold started --
+# the scale-to-zero shape -- and again against the same container after it has
+# been up and serving, the always-on shape. Both must return byte-identical
+# bodies for the whole id space, recomputed locally, and both must show the
+# server performing exactly requests x WORK_ROUNDS hash rounds. No latency or
+# cost number is recorded before this passes.
+hb_cell "prepare:equivalence-gate"
+drm
+coldstart >/dev/null || {
+	echo "app never came up" >&2
+	hb_done "prepare:equivalence-gate" fail
+	exit 1
+}
+(
+	while sleep 20; do hb_tick; done
+) &
+ticker=$!
+gate_ok=yes
+APP_URL=$APP IDS=$IDS go test ./bench -count=1 -timeout 30m 2>&1 | tail -3 || gate_ok=""
+# Same container, now warm and having served the whole id space once: the
+# always-on shape must agree with the cold one, byte for byte.
+APP_URL=$APP IDS=$IDS go test ./bench -count=1 -timeout 30m 2>&1 | tail -3 || gate_ok=""
+kill "$ticker" 2>/dev/null || true
+if [ -z "$gate_ok" ]; then
+	hb_done "prepare:equivalence-gate" fail
+	echo "equivalence gate failed; refusing to measure" >&2
+	exit 1
+fi
+hb_done "prepare:equivalence-gate" ok
 
 # ---- idle calibration ------------------------------------------------------
 # The always-on arm's declared idle is not assumed to be free. This cell holds
