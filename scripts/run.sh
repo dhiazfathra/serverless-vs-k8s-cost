@@ -34,7 +34,7 @@ DUTIES=${DUTIES:-"1.0 0.5 0.25 0.1 0.05 0.02"}
 # p99 8 ms, burst 1 dropped 551 of 10 000 arrivals at p99 34 ms and max 133 ms.
 # A baseline that saturates intermittently makes every delta measured against it
 # worthless, so the offered rate was halved rather than the gate loosened. The
-# refused cell is kept at results/raw/calib.d/REFUSED.json as evidence.
+# refused cell is kept at results/refused/calibration-at-2000rps/ as evidence.
 RATE=${RATE:-1000}
 BURST=${BURST:-10s}
 BURST_S=${BURST_S:-10}
@@ -168,15 +168,29 @@ if [ -x "$LOCK" ]; then
 		echo "lock not acquired after 12 attempts; re-run to resume"
 		exit 1
 	}
-	release() { "$LOCK" release "$ME"; }
+	released=""
+	release() {
+		[ -n "$released" ] && return 0
+		released=yes
+		"$LOCK" release "$ME"
+	}
+	# Registered ONLY inside the branch that actually acquired, so it can never
+	# release a lock this run does not hold. Without it a run killed mid-sweep
+	# orphans the lock, and the stale-reclaim path deliberately waits 45 minutes
+	# before touching a held lock -- which is 45 minutes of another experiment
+	# starving. That happened once during development.
+	trap release EXIT INT TERM
 else
 	echo "WARNING: $LOCK missing, measuring without the shared lock" >&2
 	release() { :; }
 fi
 
+# Belt and braces on top of the lock. This can wait minutes, so it ticks:
+# a wait that publishes no progress is indistinguishable from a hang.
 for _ in $(seq 1 30); do
 	ps -eo args | grep -Ei '[k]6 run|[v]egeta|[w]rk |[b]akeoff' >/dev/null || break
 	echo "foreign load generator still running; waiting"
+	hb_tick
 	sleep 10
 done
 
