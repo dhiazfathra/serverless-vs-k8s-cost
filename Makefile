@@ -6,9 +6,10 @@ bench: ## build, gate equivalence, sweep duty cycle on both arms, write results/
 test:
 	go test ./internal/...
 	python3 scripts/gate_test.py
-	./scripts/require_lock_test.sh
+	python3 scripts/hostload_test.py
 	python3 scripts/cell_test.py
 	python3 scripts/cost_test.py
+	./scripts/require_lock_test.sh
 
 lint:
 	golangci-lint run
