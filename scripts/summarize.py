@@ -83,10 +83,7 @@ w(
 )
 w("| arm | lifecycle | cold starts | pays for idle |")
 w("| --- | --- | --- | --- |")
-w(
-    "| `always-on` | container held running across the whole cell | never | yes, "
-    "the full period |"
-)
+w("| `always-on` | container held running across the whole cell | never | yes, the full period |")
 w(
     "| `scale-to-zero` | container destroyed and recreated around bursts once an "
     "idle gap outlasts the idle timeout | one per cold burst | only up to the "
@@ -118,9 +115,7 @@ for d in duties:
         sp = f["warm_p99_spread"]
         mark = " !" if sp > SPREAD_FLAG else ""
         if sp > SPREAD_FLAG:
-            flags.append(
-                f"{arm} duty={d}: kept reps disagree by {sp * 100:.0f}% at warm p99"
-            )
+            flags.append(f"{arm} duty={d}: kept reps disagree by {sp * 100:.0f}% at warm p99")
         w(
             f"| `{arm}` | {d} | {1 - d:.2f} | {f['reqs']:.0f} | "
             f"{f['reqs'] / offered * 100:.1f}% | {f['cpu_s']:.2f} | "
@@ -166,10 +161,7 @@ for d in duties:
         cs = sorted(f["cold_start_ms"])
         rate_per_m = f["cold_starts"] / f["reqs"] * 1e6
         if not cs:
-            w(
-                f"| `{arm}` | {d} | 0 | 0 | -- | -- | -- | "
-                f"{f['warm_p50_ms']:.2f} | -- |"
-            )
+            w(f"| `{arm}` | {d} | 0 | 0 | -- | -- | -- | {f['warm_p50_ms']:.2f} | -- |")
             continue
         p50 = st.median(cs)
         p99 = cs[min(len(cs) - 1, int(0.99 * len(cs)))]
@@ -196,10 +188,7 @@ for name, comp in p["comparisons"].items():
     s2z = p["price_sets"][comp["scale_to_zero"]]
     ao = p["price_sets"][comp["always_on"]]
     w(f"### {comp['label']}\n")
-    w(
-        f"`scale-to-zero` priced as **{s2z['label']}**, `always-on` as "
-        f"**{ao['label']}**.\n"
-    )
+    w(f"`scale-to-zero` priced as **{s2z['label']}**, `always-on` as **{ao['label']}**.\n")
     a, b = {}, {}
     w("| duty | idle frac | scale-to-zero $/1M | always-on $/1M | ratio | cheaper |")
     w("| --- | --- | --- | --- | --- | --- |")
@@ -210,10 +199,7 @@ for name, comp in p["comparisons"].items():
         a[d] = per_million(s2z, folded[ka]["billed_wall_s"], folded[ka]["reqs"], reserved)
         b[d] = per_million(ao, folded[kb]["billed_wall_s"], folded[kb]["reqs"], reserved)
         cheap = "scale-to-zero" if a[d] < b[d] else "always-on"
-        w(
-            f"| {d} | {1 - d:.2f} | ${a[d]:.4f} | ${b[d]:.4f} | "
-            f"{a[d] / b[d]:.2f}x | `{cheap}` |"
-        )
+        w(f"| {d} | {1 - d:.2f} | ${a[d]:.4f} | ${b[d]:.4f} | {a[d] / b[d]:.2f}x | `{cheap}` |")
     w("")
     x, br = crossover(sorted(a), a, b)
     if x is None:

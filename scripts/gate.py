@@ -54,13 +54,10 @@ def check(cell, expect_offered, min_samples=200):
             "(open loop broke down; this is a saturated cell, not a data point)"
         )
     if cell.get("dropped", 0) > DROPPED_MAX * off:
-        bad.append(
-            f"dropped {cell['dropped']} iterations (> {DROPPED_MAX:.1%} of {off})"
-        )
+        bad.append(f"dropped {cell['dropped']} iterations (> {DROPPED_MAX:.1%} of {off})")
     if got * 0.01 < min_samples:
         bad.append(
-            f"{got} requests puts only {got * 0.01:.0f} samples above p99, "
-            f"need {min_samples}"
+            f"{got} requests puts only {got * 0.01:.0f} samples above p99, need {min_samples}"
         )
 
     # The resource meter is the primary instrument here. A cell whose meter read
@@ -92,10 +89,7 @@ def check(cell, expect_offered, min_samples=200):
     if want is None:
         bad.append("cell does not declare expected_cold_starts")
     elif cold != want:
-        bad.append(
-            f"{arm} cell recorded {cold} cold starts, the sweep parameters "
-            f"predict {want}"
-        )
+        bad.append(f"{arm} cell recorded {cold} cold starts, the sweep parameters predict {want}")
     if arm == "always-on" and cold != 0:
         bad.append(f"always-on cell recorded {cold} cold starts; it must never restart")
 
@@ -143,9 +137,19 @@ def main():
             {
                 k: cell.get(k)
                 for k in (
-                    "arm", "duty", "rep", "reqs", "rps_achieved", "dropped",
-                    "cpu_s", "peak_rss_bytes", "active_wall_s", "billed_wall_s",
-                    "cold_starts", "warm_p50_ms", "warm_p99_ms",
+                    "arm",
+                    "duty",
+                    "rep",
+                    "reqs",
+                    "rps_achieved",
+                    "dropped",
+                    "cpu_s",
+                    "peak_rss_bytes",
+                    "active_wall_s",
+                    "billed_wall_s",
+                    "cold_starts",
+                    "warm_p50_ms",
+                    "warm_p99_ms",
                 )
             }
         )

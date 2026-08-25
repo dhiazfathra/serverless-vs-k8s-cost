@@ -55,14 +55,30 @@ def main():
         billed_wall = sum(burst_walls) + n * gap
 
     if meta["arm"] == "scale-to-zero":
-        # Each burst is a fresh process, so its cumulative meter IS its burst.
-        cpu_s = sum(b["server"]["cpu_s_cumulative"] for b in bursts)
+        # A burst that cold-started begins a NEW process; a burst that did not
+        # is served by the process the previous burst left running, and the
+        # server's meter is cumulative within a process. Summing every burst's
+        # cumulative reading therefore double-counts every warm burst: at duty
+        # 1.0 the idle gap is zero, both bursts share one process, and the naive
+        # sum reported 1.5x the CPU-seconds actually consumed. Sum the LAST
+        # reading of each process run instead.
+        runs = []
+        for b in bursts:
+            if b["cold_start_ms"] is not None or not runs:
+                runs.append([b])
+            else:
+                runs[-1].append(b)
+        cpu_s = sum(r[-1]["server"]["cpu_s_cumulative"] for r in runs)
+        rounds_total = sum(r[-1]["server"]["rounds_total"] for r in runs)
         peak_rss = max(b["server"]["peak_rss_bytes"] for b in bursts)
+        processes = len(runs)
     else:
         # One long-lived process, reset once at the top of the cell, read once at
         # the end: the last reading already spans every burst and every gap.
         cpu_s = bursts[-1]["server"]["cpu_s"]
+        rounds_total = bursts[-1]["server"]["rounds_total"]
         peak_rss = bursts[-1]["server"]["peak_rss_bytes"]
+        processes = 1
 
     reqs = sum(b["reqs"] for b in bursts)
     cell = {
@@ -74,9 +90,8 @@ def main():
         "failed": sum(b["failed"] for b in bursts),
         "divergent_bodies": sum(b["divergent_bodies"] for b in bursts),
         "work_rounds": bursts[-1]["server"]["work_rounds"],
-        "rounds_total": sum(b["server"]["rounds_total"] for b in bursts)
-        if meta["arm"] == "scale-to-zero"
-        else bursts[-1]["server"]["rounds_total"],
+        "rounds_total": rounds_total,
+        "processes": processes,
         "cpu_s": cpu_s,
         "cpu_ms_per_request": cpu_s / reqs * 1000 if reqs else None,
         "peak_rss_bytes": peak_rss,

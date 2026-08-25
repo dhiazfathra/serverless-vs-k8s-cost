@@ -146,7 +146,9 @@ def main():
             b[d] = per_million(ao, folded[kb]["billed_wall_s"], folded[kb]["reqs"], reserved)
             print(f"   duty {d:<6} s2z ${a[d]:.4f}/1M   always-on ${b[d]:.4f}/1M")
         x, br = crossover(sorted(a), a, b)
-        print(f"   crossover: {'none in range' if x is None else f'duty ~{x:.3f} (between {br[0]} and {br[1]})'}\n")
+        print(
+            f"   crossover: {'none in range' if x is None else f'duty ~{x:.3f} (between {br[0]} and {br[1]})'}\n"
+        )
 
 
 if __name__ == "__main__":

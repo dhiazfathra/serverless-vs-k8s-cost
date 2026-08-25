@@ -62,41 +62,63 @@ def main():
     # declared its own delivered count as the offered load. Graded against its
     # own field the achieved/offered ratio is a perfect 100%; graded against the
     # sweep's nominal parameters it is obviously a saturated cell.
-    saturated = good(reqs=12781, dropped=7219, offered_total=12781,
-                     rounds_total=12781 * 200)
+    saturated = good(reqs=12781, dropped=7219, offered_total=12781, rounds_total=12781 * 200)
     assert saturated["reqs"] == saturated["offered_total"], "fixture is not the bug"
-    refuses("saturated cell self-declaring its offered load", saturated,
-            needle="not the cell that was asked for")
+    refuses(
+        "saturated cell self-declaring its offered load",
+        saturated,
+        needle="not the cell that was asked for",
+    )
 
     refuses("achieved below 99% of offered", good(reqs=19000), needle="open loop broke down")
     refuses("dropped iterations", good(dropped=200), needle="dropped")
     refuses("failed requests", good(failed=3), needle="failed")
     refuses("divergent response bodies", good(divergent_bodies=1), needle="identical work")
-    refuses("too few samples for a p99", good(reqs=15000, offered_total=15000), expect_offered=15000,
-            needle="samples above p99")
+    refuses(
+        "too few samples for a p99",
+        good(reqs=15000, offered_total=15000),
+        expect_offered=15000,
+        needle="samples above p99",
+    )
     refuses("resource meter read zero cpu", good(cpu_s=0), needle="cpu_s is zero")
     refuses("resource meter read zero rss", good(peak_rss_bytes=0), needle="peak_rss_bytes")
     refuses("zero active wall", good(active_wall_s=0), needle="active_wall_s")
-    refuses("unequal handler work", good(rounds_total=20000 * 199), needle="handler work is not equal")
+    refuses(
+        "unequal handler work", good(rounds_total=20000 * 199), needle="handler work is not equal"
+    )
     refuses("always-on arm that restarted", good(cold_starts=1), needle="must never restart")
-    refuses("scale-to-zero arm that did not cold-start when the sweep said it would",
-            good(arm="scale-to-zero", cold_starts=1, expected_cold_starts=2),
-            needle="the sweep parameters predict 2")
-    refuses("cell that does not declare its expected cold starts",
-            good(expected_cold_starts=None), needle="does not declare expected_cold_starts")
-    refuses("a burst that overran its nominal duration",
-            good(cycles_detail=[{"duration_s": 5, "run_wall_s": 7.4, "warm_p99_ms": 2.0},
-                                {"duration_s": 5, "run_wall_s": 5.0, "warm_p99_ms": 2.0}]),
-            needle="off its nominal")
+    refuses(
+        "scale-to-zero arm that did not cold-start when the sweep said it would",
+        good(arm="scale-to-zero", cold_starts=1, expected_cold_starts=2),
+        needle="the sweep parameters predict 2",
+    )
+    refuses(
+        "cell that does not declare its expected cold starts",
+        good(expected_cold_starts=None),
+        needle="does not declare expected_cold_starts",
+    )
+    refuses(
+        "a burst that overran its nominal duration",
+        good(
+            cycles_detail=[
+                {"duration_s": 5, "run_wall_s": 7.4, "warm_p99_ms": 2.0},
+                {"duration_s": 5, "run_wall_s": 5.0, "warm_p99_ms": 2.0},
+            ]
+        ),
+        needle="off its nominal",
+    )
 
     # Non-stationary is a WARNING, not a refusal: the throughput is still real.
     _, warn = check(
-        good(cycles=4, cycles_detail=[
-            {"duration_s": 5, "run_wall_s": 5.0, "warm_p99_ms": 2.0},
-            {"duration_s": 5, "run_wall_s": 5.0, "warm_p99_ms": 5.0},
-            {"duration_s": 5, "run_wall_s": 5.0, "warm_p99_ms": 9.0},
-            {"duration_s": 5, "run_wall_s": 5.0, "warm_p99_ms": 40.0},
-        ]),
+        good(
+            cycles=4,
+            cycles_detail=[
+                {"duration_s": 5, "run_wall_s": 5.0, "warm_p99_ms": 2.0},
+                {"duration_s": 5, "run_wall_s": 5.0, "warm_p99_ms": 5.0},
+                {"duration_s": 5, "run_wall_s": 5.0, "warm_p99_ms": 9.0},
+                {"duration_s": 5, "run_wall_s": 5.0, "warm_p99_ms": 40.0},
+            ],
+        ),
         OFFERED,
     )
     assert any("non-stationary" in w for w in warn), f"stationarity check silent: {warn}"
