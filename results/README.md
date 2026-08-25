@@ -10,7 +10,11 @@ comes from a file in here.
 - `raw/sweep_<arm>_d<duty>_rep<n>.d/` — that cell's per-burst artefacts before
   folding: `<i>.k6.json` (the open-loop load report), `<i>.stats.json` (the
   server's own resource meter), `<i>.cold.json` (the measured cold start), and
-  `meta.json` (the sweep parameters the gate grades against).
+  `meta.json` (the sweep parameters the gate grades against). `host_load_start.json`
+  and `host_load_end.json` (`scripts/hostload.py`) are the 1/5/15-min load
+  average and non-harness CPU% sampled at the top and bottom of the cell; folded
+  into the cell record as `host_load` so a contended cell can be told apart from
+  a saturated arm after the fact.
 - `raw/calib.json` — the calibration cell on the **baseline** arm. The whole run
   aborts if the always-on arm cannot hold the offered rate, because every dollar
   delta in the matrix is measured against it.

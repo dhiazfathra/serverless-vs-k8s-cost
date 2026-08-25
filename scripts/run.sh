@@ -302,6 +302,12 @@ run_cell() { # arm duty rep out
 arm, cycles = '$arm', $CYCLES
 print(0 if arm == 'always-on' else (cycles if $gap >= $IDLE_TIMEOUT else 1))")
 
+	# Host contention, recorded INTO the cell, not just eyeballed on the side:
+	# 1/5/15-min load average and non-harness CPU% at cell start and cell end.
+	# cell.py reads these two files directly out of the cell dir and folds them
+	# into the cell record as "host_load".
+	python3 scripts/hostload.py "$d/host_load_start.json"
+
 	python3 - "$d/meta.json" <<PY
 import json
 json.dump({
@@ -364,6 +370,7 @@ PY
 		fi
 	done
 
+	python3 scripts/hostload.py "$d/host_load_end.json"
 	python3 scripts/cell.py "$d" "$out.tmp"
 	if python3 scripts/gate.py "$out.tmp" "$EXPECT_OFFERED" "$MIN_SAMPLES"; then
 		mv "$out.tmp" "$out"

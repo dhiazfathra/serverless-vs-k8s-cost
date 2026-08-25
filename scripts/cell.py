@@ -35,6 +35,19 @@ def main():
         k6["cold_start_ms"] = cold["cold_start_ms"] if cold else None
         bursts.append(k6)
 
+    host_load = None
+    start_path = os.path.join(d, "host_load_start.json")
+    end_path = os.path.join(d, "host_load_end.json")
+    if os.path.exists(start_path) and os.path.exists(end_path):
+        start = json.load(open(start_path))
+        end = json.load(open(end_path))
+        host_load = {
+            "start": start,
+            "end": end,
+            "load1_avg": (start["load1"] + end["load1"]) / 2,
+            "nonharness_cpu_pct_avg": (start["nonharness_cpu_pct"] + end["nonharness_cpu_pct"]) / 2,
+        }
+
     gap = meta["gap_s"]
     idle_timeout = meta["idle_timeout_s"]
     burst_walls = [b["run_wall_s"] for b in bursts]
@@ -98,6 +111,7 @@ def main():
         "active_wall_s": active_wall,
         "billed_wall_s": billed_wall,
         "idle_fraction_declared": gap / (meta["burst_s"] + gap) if (meta["burst_s"] + gap) else 0,
+        "host_load": host_load,
         "cold_starts": len(cold_ms),
         "cold_start_ms": cold_ms,
         # Warm latency is the mean of the per-burst percentiles. Cold starts are

@@ -125,6 +125,52 @@ for d in duties:
         )
 w("")
 
+# ---- host contention, recorded so a contended cell can be told apart from a
+# saturated arm -------------------------------------------------------------
+HOST_LOAD_FLAG = 0.30  # fraction difference from the calibration cell's load1
+calib_path = os.path.join(ROOT, "results/raw/calib.json")
+calib_load1 = None
+if os.path.exists(calib_path):
+    calib_cell = json.load(open(calib_path))
+    if calib_cell.get("host_load"):
+        calib_load1 = calib_cell["host_load"]["load1_avg"]
+
+cells_with_load = [c for c in cells if c.get("host_load")]
+if cells_with_load:
+    w("## Host contention (observed, not modelled)\n")
+    if calib_load1 is not None:
+        w(
+            f"Calibration cell (`always-on` duty=1.0, the baseline every delta is "
+            f"measured against) observed 1-min load average **{calib_load1:.2f}**. "
+            f"Any cell whose own 1-min load average differs from that by more than "
+            f"{HOST_LOAD_FLAG:.0%} is flagged contended below -- this is diagnostic, "
+            "not a gate; `scripts/gate.py`'s achieved-rate check is what refuses a "
+            "cell.\n"
+        )
+    else:
+        w("No calibration cell with host load on record; nothing to compare against.\n")
+    w("| cell | duty | rep | load1 avg | load5 avg | non-harness CPU% avg | contended |")
+    w("| --- | --- | --- | --- | --- | --- | --- |")
+    for c in sorted(cells_with_load, key=lambda c: (c["arm"], c["duty"], c["rep"])):
+        hl = c["host_load"]
+        contended = ""
+        if calib_load1 and calib_load1 > 0:
+            diff = abs(hl["load1_avg"] - calib_load1) / calib_load1
+            if diff > HOST_LOAD_FLAG:
+                contended = f"yes ({diff * 100:.0f}% vs calibration)"
+                flags.append(
+                    f"{c['arm']} duty={c['duty']} rep={c['rep']}: host load1 "
+                    f"{hl['load1_avg']:.2f} differs from calibration {calib_load1:.2f} "
+                    f"by {diff * 100:.0f}% (> {HOST_LOAD_FLAG:.0%}) -- contended cell"
+                )
+        avg_end = st.mean(b["nonharness_cpu_pct_avg"] for b in [hl])
+        w(
+            f"| `{c['arm']}` | {c['duty']} | {c['rep']} | {hl['load1_avg']:.2f} | "
+            f"{(hl['start']['load5'] + hl['end']['load5']) / 2:.2f} | "
+            f"{avg_end:.0f}% | {contended} |"
+        )
+    w("")
+
 idle_path = os.path.join(ROOT, "results/raw/idle_calibration.json")
 if os.path.exists(idle_path):
     ic = json.load(open(idle_path))

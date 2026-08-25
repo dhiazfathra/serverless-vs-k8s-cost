@@ -55,7 +55,7 @@ def burst(reqs, cum_cpu, cum_rounds, cold_ms):
     return b, srv, ({"cold_start_ms": cold_ms} if cold_ms is not None else None)
 
 
-def run(meta, bursts):
+def run(meta, bursts, host_load=None):
     with tempfile.TemporaryDirectory() as d:
         json.dump(meta, open(os.path.join(d, "meta.json"), "w"))
         for i, (b, srv, cold) in enumerate(bursts):
@@ -63,6 +63,10 @@ def run(meta, bursts):
             json.dump(srv, open(os.path.join(d, f"{i}.stats.json"), "w"))
             if cold:
                 json.dump(cold, open(os.path.join(d, f"{i}.cold.json"), "w"))
+        if host_load:
+            start, end = host_load
+            json.dump(start, open(os.path.join(d, "host_load_start.json"), "w"))
+            json.dump(end, open(os.path.join(d, "host_load_end.json"), "w"))
         out = os.path.join(d, "cell.json")
         subprocess.run([sys.executable, os.path.join(HERE, "cell.py"), d, out], check=True)
         return json.load(open(out))
