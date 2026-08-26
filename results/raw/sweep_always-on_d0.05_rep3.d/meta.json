@@ -1,0 +1,20 @@
+{
+  "mode": "sweep",
+  "arm": "always-on",
+  "duty": 0.05,
+  "rep": 3,
+  "cycles": 2,
+  "burst_s": 10,
+  "rate_offered": 1000,
+  "gap_s": 190.0,
+  "period_s": 200.0,
+  "slept_gap_s": 13.0,
+  "idle_timeout_s": 10,
+  "expected_cold_starts": 0,
+  "ids": 10000,
+  "seed": 20260825,
+  "work_rounds": 200,
+  "min_samples": 200,
+  "reserved_vcpu": 1.0,
+  "reserved_gib": 0.5
+}

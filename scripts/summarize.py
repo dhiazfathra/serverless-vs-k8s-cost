@@ -59,8 +59,8 @@ w(
 for k, n in sorted(per_cell_reps.items(), key=lambda x: str(x[0])):
     if n < hi:
         flags.append(
-            f"{k[0]} duty={k[1]}: only {n} kept reps (of {hi}) -- the gate refused "
-            "the rest, so this cell's spread is over fewer reps than the others"
+            f"{k[0]} duty={k[1]}: only {n} kept reps (of {hi}), so this cell's "
+            "spread is over fewer reps than the others"
         )
 
 w(
@@ -149,7 +149,7 @@ if cells_with_load:
         )
     else:
         w("No calibration cell with host load on record; nothing to compare against.\n")
-    w("| cell | duty | rep | load1 avg | load5 avg | non-harness CPU% avg | contended |")
+    w("| cell | duty | rep | load1 avg | load5 avg | non-harness CPU% avg | vs calibration |")
     w("| --- | --- | --- | --- | --- | --- | --- |")
     for c in sorted(cells_with_load, key=lambda c: (c["arm"], c["duty"], c["rep"])):
         hl = c["host_load"]
@@ -157,11 +157,17 @@ if cells_with_load:
         if calib_load1 and calib_load1 > 0:
             diff = abs(hl["load1_avg"] - calib_load1) / calib_load1
             if diff > HOST_LOAD_FLAG:
-                contended = f"yes ({diff * 100:.0f}% vs calibration)"
+                # Direction matters and the old label ignored it. The
+                # calibration cell happened to run at the noisiest moment of the
+                # session, so most flagged cells are QUIETER than it, not
+                # busier. Calling those "contended" inverted the meaning.
+                busier = hl["load1_avg"] > calib_load1
+                word = "busier" if busier else "quieter"
+                contended = f"{word} ({diff * 100:.0f}% vs calibration)"
                 flags.append(
                     f"{c['arm']} duty={c['duty']} rep={c['rep']}: host load1 "
-                    f"{hl['load1_avg']:.2f} differs from calibration {calib_load1:.2f} "
-                    f"by {diff * 100:.0f}% (> {HOST_LOAD_FLAG:.0%}) -- contended cell"
+                    f"{hl['load1_avg']:.2f} is {diff * 100:.0f}% {word} than "
+                    f"calibration {calib_load1:.2f} (> {HOST_LOAD_FLAG:.0%})"
                 )
         avg_end = st.mean(b["nonharness_cpu_pct_avg"] for b in [hl])
         w(

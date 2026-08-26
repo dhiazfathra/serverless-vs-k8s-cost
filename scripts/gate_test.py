@@ -11,7 +11,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from gate import check  # noqa: E402
+from gate import ACHIEVED_MIN, DROPPED_MAX, check  # noqa: E402
 
 OFFERED = 20000
 
@@ -123,6 +123,28 @@ def main():
     )
     assert any("non-stationary" in w for w in warn), f"stationarity check silent: {warn}"
     print("  flagged a non-stationary cell without refusing it")
+
+    # The gates must be MUTUALLY SATISFIABLE. Every threshold here is a
+    # tolerance, so the worst case each one explicitly allows must still be
+    # admissible -- otherwise a "tolerance" is a refusal wearing a tolerance's
+    # clothes. This caught a real defect: the rate gate admitted down to
+    # ACHIEVED_MIN * offered (19 800) while the sample-count gate demanded
+    # 20 000 exactly, so the admissible band was a single point and five real
+    # cells were refused for losing 2 requests out of 20 000.
+    worst_reqs = int(ACHIEVED_MIN * OFFERED)
+    worst = good(
+        reqs=worst_reqs,
+        dropped=int(DROPPED_MAX * OFFERED),
+        # rounds_total is reqs * work_rounds in a real cell, so it has to track
+        # reqs here too -- otherwise this asserts against an impossible cell.
+        rounds_total=worst_reqs * 200,
+    )
+    bad, _ = check(worst, OFFERED)
+    assert not bad, (
+        "the gates contradict each other: a cell sitting exactly on every "
+        f"declared tolerance is still refused with {bad}"
+    )
+    print("  a cell on every declared tolerance is admissible")
 
     print("gate_test: all gates fired")
 

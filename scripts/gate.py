@@ -55,9 +55,16 @@ def check(cell, expect_offered, min_samples=200):
         )
     if cell.get("dropped", 0) > DROPPED_MAX * off:
         bad.append(f"dropped {cell['dropped']} iterations (> {DROPPED_MAX:.1%} of {off})")
-    if got * 0.01 < min_samples:
+    # Graded against the PLAN, not the achieved count -- same as the rate check
+    # above, and for the same reason. Grading it against `got` made the gate
+    # unreachable: the rate gate admits down to ACHIEVED_MIN * off (19 800 of
+    # 20 000), while `got * 0.01 >= 200` demands 20 000 exactly. The admissible
+    # band was a single point, so losing 2 requests out of 20 000 with zero
+    # drops and zero failures refused the cell. Five cells were refused this way
+    # before anyone noticed the two thresholds could not both hold.
+    if off * 0.01 < min_samples:
         bad.append(
-            f"{got} requests puts only {got * 0.01:.0f} samples above p99, need {min_samples}"
+            f"{off} offered puts only {off * 0.01:.0f} samples above p99, need {min_samples}"
         )
 
     # The resource meter is the primary instrument here. A cell whose meter read

@@ -1,0 +1,22 @@
+{
+  "rate_offered": 1000,
+  "duration": "10s",
+  "duration_s": 10,
+  "offered_total": 10000,
+  "vus": 256,
+  "max_vus": 2048,
+  "ids": 10000,
+  "seed": 20260825,
+  "reqs": 9998,
+  "rps_achieved": 999.8,
+  "dropped": 0,
+  "failed": 0,
+  "divergent_bodies": 0,
+  "run_wall_s": 10.0017385,
+  "warm_p50_ms": 0.6715895000000001,
+  "warm_p95_ms": 3.4129016499999976,
+  "warm_p99_ms": 6.8646495,
+  "warm_avg_ms": 1.126372510802158,
+  "warm_max_ms": 23.239931,
+  "recv_bytes": 2087476
+}

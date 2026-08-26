@@ -1,0 +1,15 @@
+{
+  "cpu_s": 0.014426000000000216,
+  "cpu_s_cumulative": 3.1069660000000003,
+  "peak_rss_bytes": 11710464,
+  "process_uptime_s": 71.16656017,
+  "requests": 0,
+  "rounds_total": 0,
+  "since_reset_s": 60.047126639,
+  "stime_s": 0.011343000000000047,
+  "utime_s": 0.003083000000000169,
+  "work_rounds": 200,
+  "mode": "idle-calibration",
+  "idle_seconds": 60.0,
+  "idle_cpu_s_per_idle_s": 0.00024043333333333695
+}
